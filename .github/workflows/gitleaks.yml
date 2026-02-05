@@ -1,17 +1,64 @@
-name: gitleaks
+name: Gitleaks
+
 on:
   push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
   workflow_dispatch:
+
 jobs:
-  scan:
-    name: gitleaks
+  gitleaks:
     runs-on: ubuntu-latest
-    if: ${{ github.repository == 'gitleaks/gitleaks' }}
+
+    permissions:
+      contents: read
+      pull-requests: read
+
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+          fetch-depth: 2
+
+
+      # ---------------------------------
+      # Decide which commits to scan
+      # Push  -> before..after
+      # PR    -> base..HEAD
+      # ---------------------------------
+      - name: Calculate diff range
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "RANGE=origin/${{ github.base_ref }}..HEAD" >> $GITHUB_ENV
+          else
+            echo "RANGE=${{ github.event.before }}..${{ github.sha }}" >> $GITHUB_ENV
+          fi
+
+
+      # ---------------------------------
+      # Run gitleaks only on changed commits
+      # Avoids scanning full repo
+      # ---------------------------------
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE}}
+        with:
+          args: >
+            --log-opts="${{ env.RANGE }}"
+            --config=.gitleaks.toml
+            --report-format sarif
+            --report-path gitleaks.sarif
+
+      # ---------------------------------
+      # Upload results to Security tab
+      # ---------------------------------
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks.sarif
+
