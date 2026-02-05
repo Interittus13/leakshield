@@ -1,4 +1,4 @@
-name: Notification with issues
+name: Gitleak Scanning
 
 on:
   push:
