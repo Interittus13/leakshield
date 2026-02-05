@@ -16,12 +16,23 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      security-events: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
+
+
+      # ---------------------------------
+      # Install Gitleaks CLI
+      # Downloads official binary
+      # ---------------------------------
+      - name: Install Gitleaks
+        run: |
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_linux_x64.tar.gz | tar -xz
+          sudo mv gitleaks /usr/local/bin/
 
 
       # ---------------------------------
@@ -41,24 +52,24 @@ jobs:
 
       # ---------------------------------
       # Run gitleaks only on changed commits
-      # Avoids scanning full repo
+      # Generates SARIF + fails if leaks found
       # ---------------------------------
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          args: >
-            --log-opts="${{ env.RANGE }}"
-            --config=.gitleaks.toml
-            --report-format sarif
-            --report-path gitleaks.sarif
+      - name: Run Gitleaks scan
+        run: |
+          gitleaks detect \
+            --log-opts="$RANGE" \
+            --config=.gitleaks.toml \
+            --report-format sarif \
+            --report-path=gitleaks.sarif \
+            --exit-code 1
 
       # ---------------------------------
       # Upload results to Security tab
+      # Skips for fork PRs (permission issue)
       # ---------------------------------
       - name: Upload SARIF results
-        uses: github/codeql-action/upload-sarif@v3
+        if: always() && github.event.pull_request.head.repo.fork == false
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: gitleaks.sarif
 
