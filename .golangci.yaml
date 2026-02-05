@@ -84,3 +84,4 @@ linters:
         - '-ST1021'
     revive:
       severity: error
+      
