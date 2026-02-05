@@ -61,7 +61,22 @@ jobs:
 
 
       # ---------------------------------
-      # PR comment only
+      # Success summary (clean UX)
+      # No PR spam
+      # ---------------------------------
+      - name: Comment on PR success
+        if: success() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              body: "✅ Gitleaks passed — no secrets detected."
+            })
+
+
+      # ---------------------------------
+      # PR comment only if failed
       # ---------------------------------
       - name: Comment on PR
         if: github.event_name == 'pull_request' && steps.gitleaks.outcome == 'failure'
