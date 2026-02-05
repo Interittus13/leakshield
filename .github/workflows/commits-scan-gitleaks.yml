@@ -36,7 +36,7 @@ jobs:
             -v $PWD:/repo \
             zricethezav/gitleaks:latest detect \
             --source=/repo \
-            --log-opts="$RANGE" \
+            --log-opts="${{ github.event.before }}..${{ github.sha }}" \
             --config=/repo/.gitleaks.toml \
             --exit-code 1
         continue-on-error: true
