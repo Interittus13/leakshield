@@ -38,7 +38,8 @@ jobs:
       - name: Calculate diff range
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "RANGE=origin/${{ github.base_ref }}..HEAD" >> $GITHUB_ENV
+            # only last commit
+            echo "RANGE=HEAD~1..HEAD" >> $GITHUB_ENV
           elif [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
             echo "RANGE=HEAD" >> $GITHUB_ENV
           else
