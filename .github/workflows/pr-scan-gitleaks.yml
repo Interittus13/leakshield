@@ -50,31 +50,35 @@ jobs:
         id: gitleaks
         run: |
           docker run --rm \
-            -v $PWD:/repo \
-            zricethezav/gitleaks:latest detect \
-            --source=/repo \
-            --files="$FILES" \
-            --config=/repo/.gitleaks.toml \
-            --exit-code 1
+              -v $PWD:/repo \
+              zricethezav/gitleaks:latest detect \
+              --source=/repo \
+              --log-opts="$RANGE" \
+              --config=/repo/.gitleaks.toml \
+              --report-format json \
+              --report-path /repo/gitleaks-report.json \
+              --redact \
+              --exit-code 1
         continue-on-error: true
 
 
       # ---------------------------------
-      # Run Gitleaks using Docker
-      # Scans ONLY changed commits
+      # Show findings in logs
       # ---------------------------------
-      - name: Run Gitleaks
-        id: gitleaks
+      - name: Show detected secrets
+        if: steps.gitleaks.outcome == 'failure'
         run: |
-          docker run --rm \
-            -v $PWD:/repo \
-            zricethezav/gitleaks:latest detect \
-            --source=/repo \
-            --log-opts="$RANGE" \
-            --config=/repo/.gitleaks.toml \
-            --exit-code 1
-        continue-on-error: true
+          cat gitleaks-report.json
 
+
+      # ---------------------------------
+      # Add pretty summary
+      # ---------------------------------
+      - name: Add summary
+        if: steps.gitleaks.outcome == 'failure'
+        run: |
+          echo "## 🚨 Gitleaks Findings" >> $GITHUB_STEP_SUMMARY
+          cat gitleaks-report.json >> $GITHUB_STEP_SUMMARY
 
       # ---------------------------------
       # PR comment only if failed
