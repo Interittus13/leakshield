@@ -1,12 +1,8 @@
-name: Gitleak Scanning
+name: Gitleaks Scanning
 
 on:
   push:
-    branches:
-      - "**"
   pull_request:
-    branches:
-      - "**"
   workflow_dispatch:
 
 jobs:
@@ -20,27 +16,53 @@ jobs:
       pull-requests: write
 
     steps:
+
+      # ---------------------------------
+      # Checkout minimal commits only
+      # Faster than full history clone
+      # ---------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          fetch-tags: true
+          fetch-depth: 2
 
 
-      # -----------------------------
-      # Run gitleaks only on changed commits or on PRs
-      # -----------------------------
+      # ---------------------------------
+      # Decide commit diff range
+      # Push  -> before..after
+      # PR    -> base..HEAD
+      # ---------------------------------
+      - name: Calculate diff range
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "RANGE=origin/${{ github.base_ref }}..HEAD" >> $GITHUB_ENV
+          elif [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            echo "RANGE=HEAD" >> $GITHUB_ENV
+          else
+            echo "RANGE=${{ github.event.before }}..${{ github.sha }}" >> $GITHUB_ENV
+          fi
+
+
+      # ---------------------------------
+      # Run Gitleaks using Docker
+      # Scans ONLY changed commits
+      # ---------------------------------
       - name: Run Gitleaks
         id: gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_CONFIG: '${{ github.workspace }}/.gitleaks.toml'
+        run: |
+          docker run --rm \
+            -v $PWD:/repo \
+            zricethezav/gitleaks:latest detect \
+            --source=/repo \
+            --log-opts="$RANGE" \
+            --config=/repo/.gitleaks.toml \
+            --exit-code 1
         continue-on-error: true
 
-      # -----------------------------
-      # Comment on PR only
-      # -----------------------------
+
+      # ---------------------------------
+      # PR comment only
+      # ---------------------------------
       - name: Comment on PR
         if: github.event_name == 'pull_request' && steps.gitleaks.outcome == 'failure'
         uses: actions/github-script@v7
@@ -51,26 +73,23 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: `
-            **Gitleaks Alert – Secrets Detected**
+              **Gitleaks Alert – Secrets Detected**
 
-            @${context.actor} @${context.repo.owner}
+              Secrets were detected in this PR.
 
-            Gitleaks has detected secrets in this pull request.
+              **Repository:** ${context.repo.owner}/${context.repo.repo}
+              **PR:** #${context.issue.number}
+              **Commit:** ${context.sha}
 
-            **Repository:** ${context.repo.owner}/${context.repo.repo}
-            **PR:** #${context.issue.number}
-            **Commit:** ${context.sha}
-
-            Please remove the secret immediately and rotate any exposed credentials.
-            `
+              Please remove the secret immediately and rotate any exposed credentials.
+              `
             });
 
-      # -----------------------------
-      # Create issue only for pushes (not PRs)
-      # avoids spam
-      # -----------------------------
+
+      # ---------------------------------
+      # Create issue only for push
+      # ---------------------------------
       - name: Create GitHub Issue
-        # if: steps.gitleaks.outcome == 'failure'
         if: github.event_name == 'push' && steps.gitleaks.outcome == 'failure'
         uses: actions/github-script@v7
         with:
@@ -126,6 +145,9 @@ jobs:
               });
             }
 
+      # ---------------------------------
+      # Finally fail job
+      # ---------------------------------
       - name: Fail workflow if secrets detected
         if: steps.gitleaks.outcome == 'failure'
         run: exit 1
