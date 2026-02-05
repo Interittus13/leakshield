@@ -1,4 +1,4 @@
-name: Gitleaks
+name: Notification with issues
 
 on:
   push:
@@ -11,11 +11,13 @@ on:
 
 jobs:
   gitleaks:
+    name: Gitleaks Scan
     runs-on: ubuntu-latest
 
     permissions:
       contents: read
-      pull-requests: read
+      issues: write
+      pull-requests: write
 
     steps:
       - name: Checkout code
@@ -24,9 +26,106 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+
+      # -----------------------------
+      # Run gitleaks only on changed commits or on PRs
+      # -----------------------------
       - name: Run Gitleaks
+        id: gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: '${{ github.workspace }}/.gitleaks.toml'
+        continue-on-error: true
 
+      # -----------------------------
+      # Comment on PR only
+      # -----------------------------
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.gitleaks.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `
+            **Gitleaks Alert – Secrets Detected**
+
+            @${context.actor} @${context.repo.owner}
+
+            Gitleaks has detected secrets in this pull request.
+
+            **Repository:** ${context.repo.owner}/${context.repo.repo}
+            **PR:** #${context.issue.number}
+            **Commit:** ${context.sha}
+
+            Please remove the secret immediately and rotate any exposed credentials.
+            `
+            });
+
+      # -----------------------------
+      # Create issue only for pushes (not PRs)
+      # avoids spam
+      # -----------------------------
+      - name: Create GitHub Issue
+        # if: steps.gitleaks.outcome == 'failure'
+        if: github.event_name == 'push' && steps.gitleaks.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Secrets detected by Gitleaks';
+
+            const body = `
+            **Security Alert**
+
+            Secrets were detected in the repository.
+
+            **Repository:** ${context.repo.owner}/${context.repo.repo}
+            **Branch:** ${context.ref.replace('refs/heads/', '')}
+            **Commit:** ${context.sha}
+            **Triggered by:** ${context.actor}
+
+            Action required:
+            - Remove the secret from the codebase
+            - Rotate the exposed credentials immediately
+
+            ---
+            _This issue was automatically created by github-actions[bot]._
+            `;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'security,gitleaks'
+            });
+
+            const existingIssue = issues.find(issue => issue.title === title);
+
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['security', 'gitleaks', 'automated']
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: existingIssue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `
+                New secret detected
+
+                **Commit:** ${context.sha}
+                **Triggered by:** @${context.actor}
+                `
+              });
+            }
+
+      - name: Fail workflow if secrets detected
+        if: steps.gitleaks.outcome == 'failure'
+        run: exit 1
