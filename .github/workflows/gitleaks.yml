@@ -16,7 +16,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-      security-events: write
 
     steps:
       - name: Checkout code
@@ -41,35 +40,26 @@ jobs:
       # PR    -> base..HEAD
       # ---------------------------------
       - name: Calculate diff range
-        shell: bash
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "RANGE=origin/${{ github.base_ref }}..HEAD" >> $GITHUB_ENV
+          elif [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            echo "RANGE=HEAD" >> $GITHUB_ENV
           else
             echo "RANGE=${{ github.event.before }}..${{ github.sha }}" >> $GITHUB_ENV
           fi
 
 
       # ---------------------------------
-      # Run gitleaks only on changed commits
-      # Generates SARIF + fails if leaks found
+      # Run gitleaks ONLY on changed commits
+      #
+      # --log-opts = diff scan magic
+      # --exit-code 1 fails build if leaks found
       # ---------------------------------
       - name: Run Gitleaks scan
         run: |
           gitleaks detect \
             --log-opts="$RANGE" \
             --config=.gitleaks.toml \
-            --report-format sarif \
-            --report-path=gitleaks.sarif \
             --exit-code 1
-
-      # ---------------------------------
-      # Upload results to Security tab
-      # Skips for fork PRs (permission issue)
-      # ---------------------------------
-      - name: Upload SARIF results
-        if: always() && github.event.pull_request.head.repo.fork == false
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: gitleaks.sarif
 
