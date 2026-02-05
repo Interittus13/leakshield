@@ -27,11 +27,14 @@ jobs:
           fetch-depth: 2
 
 
-      # ---------------------------------
-      # Decide commit diff range
-      # Push  -> before..after
-      # PR    -> base..HEAD
-      # ---------------------------------
+      - name: Fetch base branch
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch origin \
+            ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }} \
+            --depth=1
+
+
       - name: Calculate diff range
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
