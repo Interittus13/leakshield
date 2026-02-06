@@ -2,6 +2,6 @@
 // Gitleaks default rules always catch these
 
 export const AWS = {
-  accessKeyId: "",
-  secretAccessKey: "//",
+  accessKeyId: "AKIAIOSFODNN7EXAMPLE",
+  secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
 };
