@@ -1,8 +1,7 @@
-name: Gitleaks Scanning
+name: Gitleaks Commits Scanning
 
 on:
   push:
-  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -13,7 +12,6 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: write
 
     steps:
 
@@ -27,25 +25,6 @@ jobs:
           fetch-depth: 2
 
 
-      - name: Fetch base branch
-        if: github.event_name == 'pull_request'
-        run: |
-          git fetch origin \
-            ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }} \
-            --depth=1
-
-
-      - name: Calculate diff range
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "RANGE=origin/${{ github.base_ref }}..HEAD" >> $GITHUB_ENV
-          elif [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
-            echo "RANGE=HEAD" >> $GITHUB_ENV
-          else
-            echo "RANGE=${{ github.event.before }}..${{ github.sha }}" >> $GITHUB_ENV
-          fi
-
-
       # ---------------------------------
       # Run Gitleaks using Docker
       # Scans ONLY changed commits
@@ -57,36 +36,31 @@ jobs:
             -v $PWD:/repo \
             zricethezav/gitleaks:latest detect \
             --source=/repo \
-            --log-opts="$RANGE" \
-            --config=/repo/.gitleaks.toml \
+            --log-opts="-p -n 1" \
+            --config=/repo/gitleaks.toml \
+            --report-format json \
+            --report-path /repo/gitleaks-report.json \
             --exit-code 1
         continue-on-error: true
 
 
       # ---------------------------------
-      # PR comment only if failed
+      # Show findings in logs
       # ---------------------------------
-      - name: Comment on PR
-        if: github.event_name == 'pull_request' && steps.gitleaks.outcome == 'failure'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `
-              **Gitleaks Alert – Secrets Detected**
+      - name: Show detected secrets
+        if: steps.gitleaks.outcome == 'failure'
+        run: |
+          cat gitleaks-report.json
 
-              Secrets were detected in this PR.
 
-              **Repository:** ${context.repo.owner}/${context.repo.repo}
-              **PR:** #${context.issue.number}
-              **Commit:** ${context.sha}
-
-              Please remove the secret immediately and rotate any exposed credentials.
-              `
-            });
+      # ---------------------------------
+      # Add pretty summary
+      # ---------------------------------
+      - name: Add summary
+        if: steps.gitleaks.outcome == 'failure'
+        run: |
+          echo "## 🚨 Gitleaks Findings" >> $GITHUB_STEP_SUMMARY
+          cat gitleaks-report.json >> $GITHUB_STEP_SUMMARY
 
 
       # ---------------------------------
