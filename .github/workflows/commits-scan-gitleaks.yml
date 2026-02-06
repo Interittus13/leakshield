@@ -46,7 +46,7 @@ jobs:
             zricethezav/gitleaks:latest detect \
             --no-git \
             --source=/repo \
-            --path=changed.txt \
+            --files-from=/repo/changed.txt \
             # --log-opts="${{ github.event.before }}..${{ github.sha }}" \
             --config=/repo/gitleaks.toml \
             --report-format json \
