@@ -37,7 +37,7 @@ jobs:
             zricethezav/gitleaks:latest detect \
             --source=/repo \
             --log-opts="-p -n 1" \
-            --config=/repo/.gitleaks.toml \
+            --config=/repo/gitleaks.toml \
             --report-format json \
             --report-path /repo/gitleaks-report.json \
             --exit-code 1

@@ -54,7 +54,7 @@ jobs:
               zricethezav/gitleaks:latest detect \
               --source=/repo \
               --log-opts="$RANGE" \
-              --config=/repo/.gitleaks.toml \
+              --config=/repo/gitleaks.toml \
               --report-format json \
               --report-path /repo/gitleaks-report.json \
               --redact \
