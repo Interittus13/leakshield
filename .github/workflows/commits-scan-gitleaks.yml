@@ -25,13 +25,6 @@ jobs:
           fetch-depth: 0
 
 
-      # This collects ONLY files changed in this push
-      - name: Get changed files
-        id: files
-        run: |
-          git diff --name-only ${{ github.event.before }} ${{ github.sha }} > changed.txt
-
-
       # ---------------------------------
       # Run Gitleaks using Docker
       # Scans ONLY changed commits
@@ -44,10 +37,8 @@ jobs:
           docker run --rm \
             -v $PWD:/repo \
             zricethezav/gitleaks:latest detect \
-            --no-git \
             --source=/repo \
-            --files-from=/repo/changed.txt \
-            # --log-opts="${{ github.event.before }}..${{ github.sha }}" \
+            --log-opts="${{ github.event.before }}..${{ github.sha }}" \
             --config=/repo/gitleaks.toml \
             --report-format json \
             --report-path /repo/gitleaks-report.json \
