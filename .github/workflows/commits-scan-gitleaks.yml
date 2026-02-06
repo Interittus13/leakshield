@@ -32,6 +32,8 @@ jobs:
       - name: Run Gitleaks
         id: gitleaks
         run: |
+          echo "Scanning commits from ${{ github.event.before }} to ${{ github.sha }}"
+
           docker run --rm \
             -v $PWD:/repo \
             zricethezav/gitleaks:latest detect \
