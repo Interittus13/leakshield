@@ -26,39 +26,27 @@ jobs:
 
 
       # ---------------------------------
-      # Get changed files only
-      # This avoids git history scanning completely
-      # ---------------------------------
-      - name: Get changed files
-        id: changes
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            git fetch origin ${{ github.event.pull_request.base.sha }} --depth=1
-            FILES=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | tr '\n' ' ')
-          else
-            FILES=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | tr '\n' ' ')
-          fi
-
-          echo "FILES=$FILES" >> $GITHUB_ENV
-
-
-      # ---------------------------------
       # Run gitleaks ONLY on changed files
       # This is 100% deterministic
       # ---------------------------------
       - name: Run Gitleaks
         id: gitleaks
         run: |
+          # This calculates diff between base branch and PR head
+          RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+
+          echo "Scanning range: $RANGE"
+
           docker run --rm \
-              -v $PWD:/repo \
-              zricethezav/gitleaks:latest detect \
-              --source=/repo \
-              --log-opts="$RANGE" \
-              --config=/repo/gitleaks.toml \
-              --report-format json \
-              --report-path /repo/gitleaks-report.json \
-              --redact \
-              --exit-code 1
+            -v $PWD:/repo \
+            zricethezav/gitleaks:latest detect \
+            --source=/repo \
+            --log-opts="$RANGE" \
+            --config=/repo/gitleaks.toml \
+            --report-format json \
+            --report-path /repo/gitleaks-report.json \
+            --redact \
+            --exit-code 1
         continue-on-error: true
 
 
