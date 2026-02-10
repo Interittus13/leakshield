@@ -15,16 +15,18 @@ jobs:
 
     steps:
       # ---------------------------------
-      # Checkout repository code
+      # Checkout repository with FULL history
+      # Required for commit-based secret detection
       # ---------------------------------
-      # This pulls your repo so Gitleaks can scan files
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       # ---------------------------------
-      # Run Gitleaks Scan (NO-GIT MODE)
+      # Run Gitleaks Scan (FULL GIT MODE)
+      # Scans entire git history for secrets
       # ---------------------------------
-      # This runs Gitleaks inside Docker and always continues
       - name: Run Gitleaks
         id: gitleaks
         run: |
@@ -32,7 +34,6 @@ jobs:
             -v $PWD:/repo \
             zricethezav/gitleaks:latest detect \
             --source=/repo \
-            --no-git \
             --config=/repo/.gitleaks.toml \
             --report-format json \
             --report-path /repo/gitleaks-report.json \
@@ -40,24 +41,25 @@ jobs:
 
       # ---------------------------------
       # Ensure report file always exists
+      # Prevents failures when no secrets found
       # ---------------------------------
-      # Prevents failures when no secrets are found
       - name: Ensure Gitleaks report exists
         run: |
           [ -f gitleaks-report.json ] || echo "[]" > gitleaks-report.json
 
       # ---------------------------------
       # Print detected secrets to logs
+      # Helpful for debugging
       # ---------------------------------
-      # Useful for quick debugging in workflow logs
       - name: Show detected secrets
-        if: steps.gitleaks.outcome == 'failure'
-        run: cat gitleaks-report.json
+        run: |
+          echo "Raw Gitleaks JSON output:"
+          cat gitleaks-report.json
 
       # ---------------------------------
       # Add GitHub Summary (Table format)
+      # Clean UI in Actions Summary tab
       # ---------------------------------
-      # This renders a clean table in the Actions Summary tab
       - name: Add summary (Gitleaks UI style)
         shell: bash
         run: |
@@ -86,8 +88,8 @@ jobs:
 
       # ---------------------------------
       # Upload Gitleaks Report as Artifact
+      # Allows downloading raw findings
       # ---------------------------------
-      # Allows security teams to download raw JSON 
       - name: Upload Gitleaks report
         uses: actions/upload-artifact@v4
         with:
@@ -95,7 +97,7 @@ jobs:
           path: gitleaks-report.json
 
       # ---------------------------------
-      # Create GitHub Issue if secrets found
+      # Create GitHub Issue if secrets exist
       # ---------------------------------
       - name: Create GitHub Issue
         if: github.event_name == 'push'
