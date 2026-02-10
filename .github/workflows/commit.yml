@@ -35,7 +35,7 @@ jobs:
             zricethezav/gitleaks:latest detect \
             --source=. \
             --log-opts="--all" \
-            --config=.gitleaks.toml \
+            --config=gitleaks.toml \
             --report-format json \
             --report-path gitleaks-report.json \
             --redact || true
