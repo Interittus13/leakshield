@@ -8,7 +8,7 @@ export const AWS = {
   GITHUB_TOKEN:"ghp_a1b2c3d4e5f6g7h9i9j0k1l2m3n4o5p6q7r",
   PRIVATE_KEY: `
   -----BEGIN PRIVATE KEY-----
-abc123superlongrandomstringwithentropyvalue087654321
+abc123superlongrandomstringwithentropyvalue987654321
 -----END PRIVATE KEY-----
 `
 };
