@@ -2,6 +2,7 @@ name: Gitleaks Commits Scanning
 
 on:
   push:
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -12,6 +13,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: read
 
     steps:
       # ---------------------------------
@@ -23,13 +25,15 @@ jobs:
           fetch-depth: 0
 
       # ---------------------------------
-      # Run Gitleaks (ONLY new commits)
+      # Run Gitleaks (Push + PR aware)
       # ---------------------------------
-      - name: Run Gitleaks (ONLY new commits)
+      - name: Run Gitleaks
         id: gitleaks
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
             RANGE="${{ github.event.before }}..${{ github.sha }}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
           else
             RANGE="-1"
           fi
@@ -100,7 +104,7 @@ jobs:
           path: gitleaks-report.json
 
       # ---------------------------------
-      # Create GitHub Issue if secrets exist
+      # Create GitHub Issue (ONLY on push)
       # ---------------------------------
       - name: Create GitHub Issue
         if: github.event_name == 'push'
