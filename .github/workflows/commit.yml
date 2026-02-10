@@ -16,7 +16,6 @@ jobs:
     steps:
       # ---------------------------------
       # Checkout repository (FULL HISTORY)
-      # Required for commit-based scanning
       # ---------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,7 +23,7 @@ jobs:
           fetch-depth: 0
 
       # ---------------------------------
-      # Run Gitleaks (FULL GIT HISTORY MODE)
+      # Run Gitleaks (SAFE MODE)
       # ---------------------------------
       - name: Run Gitleaks
         id: gitleaks
@@ -34,7 +33,6 @@ jobs:
             -w /repo \
             zricethezav/gitleaks:latest detect \
             --source=. \
-            --log-opts="${{ github.event.before }}..${{ github.sha }}" \
             --config=gitleaks.toml \
             --report-format json \
             --report-path gitleaks-report.json \
@@ -48,7 +46,7 @@ jobs:
           [ -f gitleaks-report.json ] || echo "[]" > gitleaks-report.json
 
       # ---------------------------------
-      # Print raw findings (debug)
+      # Debug: Print raw findings
       # ---------------------------------
       - name: Show detected secrets
         run: |
@@ -56,7 +54,7 @@ jobs:
           cat gitleaks-report.json
 
       # ---------------------------------
-      # GitHub Actions Summary (Table UI)
+      # GitHub Actions Summary (UI Table)
       # ---------------------------------
       - name: Add summary (Gitleaks UI style)
         shell: bash
@@ -118,13 +116,12 @@ jobs:
             });
 
       # ---------------------------------
-      # FAIL PIPELINE if secrets found
+      # FAIL pipeline if secrets found
       # ---------------------------------
       - name: Fail workflow if secrets found
         run: |
           COUNT=$(jq length gitleaks-report.json)
           echo "Secrets found: $COUNT"
-
           if [ "$COUNT" -gt 0 ]; then
             exit 1
           fi
