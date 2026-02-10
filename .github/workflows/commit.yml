@@ -15,8 +15,8 @@ jobs:
 
     steps:
       # ---------------------------------
-      # Checkout repository with FULL history
-      # Required for commit-based secret detection
+      # Checkout repository (FULL HISTORY)
+      # Required for commit-based scanning
       # ---------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,8 +24,7 @@ jobs:
           fetch-depth: 0
 
       # ---------------------------------
-      # Run Gitleaks Scan (FULL GIT MODE)
-      # Scans entire git history for secrets
+      # Run Gitleaks (FULL GIT HISTORY MODE)
       # ---------------------------------
       - name: Run Gitleaks
         id: gitleaks
@@ -34,6 +33,7 @@ jobs:
             -v $PWD:/repo \
             zricethezav/gitleaks:latest detect \
             --source=/repo \
+            --log-opts="--all" \
             --config=/repo/.gitleaks.toml \
             --report-format json \
             --report-path /repo/gitleaks-report.json \
@@ -41,15 +41,13 @@ jobs:
 
       # ---------------------------------
       # Ensure report file always exists
-      # Prevents failures when no secrets found
       # ---------------------------------
       - name: Ensure Gitleaks report exists
         run: |
           [ -f gitleaks-report.json ] || echo "[]" > gitleaks-report.json
 
       # ---------------------------------
-      # Print detected secrets to logs
-      # Helpful for debugging
+      # Print raw findings (debug)
       # ---------------------------------
       - name: Show detected secrets
         run: |
@@ -57,8 +55,7 @@ jobs:
           cat gitleaks-report.json
 
       # ---------------------------------
-      # Add GitHub Summary (Table format)
-      # Clean UI in Actions Summary tab
+      # GitHub Actions Summary (Table UI)
       # ---------------------------------
       - name: Add summary (Gitleaks UI style)
         shell: bash
@@ -87,8 +84,7 @@ jobs:
           done
 
       # ---------------------------------
-      # Upload Gitleaks Report as Artifact
-      # Allows downloading raw findings
+      # Upload report as artifact
       # ---------------------------------
       - name: Upload Gitleaks report
         uses: actions/upload-artifact@v4
@@ -121,9 +117,8 @@ jobs:
             });
 
       # ---------------------------------
-      # Fail workflow if secrets exist
+      # FAIL PIPELINE if secrets found
       # ---------------------------------
-      # This is the ONLY place the pipeline can fail
       - name: Fail workflow if secrets found
         run: |
           COUNT=$(jq length gitleaks-report.json)
@@ -132,3 +127,4 @@ jobs:
           if [ "$COUNT" -gt 0 ]; then
             exit 1
           fi
+
