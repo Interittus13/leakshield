@@ -53,8 +53,8 @@ jobs:
             --source=/repo \
             --log-opts="$RANGE" \
             --config=/repo/gitleaks.toml \
-            --report-format json \
-            --report-path /repo/gitleaks-report.json \
+            --report-format csv \
+            --report-path /repo/gitleaks-report.csv \
             --exit-code 1
         continue-on-error: true
 
@@ -65,7 +65,7 @@ jobs:
       - name: Show detected secrets
         if: steps.gitleaks.outcome == 'failure'
         run: |
-          cat gitleaks-report.json
+          cat gitleaks-report.csv
 
 
       # ---------------------------------
@@ -75,7 +75,7 @@ jobs:
         if: steps.gitleaks.outcome == 'failure'
         run: |
           echo "## 🚨 Gitleaks Findings" >> $GITHUB_STEP_SUMMARY
-          cat gitleaks-report.json >> $GITHUB_STEP_SUMMARY
+          cat gitleaks-report.csv >> $GITHUB_STEP_SUMMARY
 
 
       # ---------------------------------
