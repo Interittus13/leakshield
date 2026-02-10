@@ -67,7 +67,7 @@ jobs:
         if: steps.gitleaks.outcome == 'failure'
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: gitleaks-report.sarif.sarif
+          sarif_file: gitleaks-report.sarif
 
 
       # ---------------------------------
