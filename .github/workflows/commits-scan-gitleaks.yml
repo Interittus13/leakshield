@@ -40,7 +40,7 @@ jobs:
         continue-on-error: true
 
       # ---------------------------------
-      # Show findings in logs (raw JSON)
+      # Show findings in logs
       # ---------------------------------
       - name: Show detected secrets
         if: steps.gitleaks.outcome == 'failure'
@@ -48,27 +48,40 @@ jobs:
           cat gitleaks-report.json
 
       # ---------------------------------
-      # Add pretty summary (FIXED TABLE FORMAT)
+      # Gitleaks-style Summary Table
       # ---------------------------------
-      - name: Add summary (table)
+      - name: Add summary (Gitleaks UI style)
         if: steps.gitleaks.outcome == 'failure'
         run: |
-          {
-            echo "## 🚨 Gitleaks Findings"
-            echo ""
-            echo "> Secrets detected in the repository"
-            echo ""
-            echo "| Rule | File | Line | Secret Type |"
-            echo "|------|------|------|-------------|"
+          REPO_URL="https://github.com/${{ github.repository }}"
+          REF="${{ github.ref_name }}"
 
-            jq -r '
+          {
+            echo "## 🔴 Gitleaks detected secrets 🔴"
+            echo ""
+            echo "| Rule ID | Commit | Secret URL | Start Line | Author | Date | Email | File |"
+            echo "|--------|--------|------------|------------|--------|------|-------|------|"
+
+            jq -r --arg repo "$REPO_URL" --arg ref "$REF" '
               .[] |
-              "| \(.RuleID) | \(.File | sub("^/repo/"; "")) | \(.StartLine) | \(.Description) |"
+              "| \(.RuleID) | " +
+              (if .Commit != "" then .Commit[0:7] else "N/A" end) + " | " +
+              "[View Secret](" +
+                $repo + "/blob/" + $ref + "/" +
+                (.File | sub(\"^/repo/\"; \"\")) +
+                \"#L\" + (.StartLine|tostring) +
+              ") | " +
+              (.StartLine|tostring) + " | " +
+              (if .Author != "" then .Author else "N/A" end) + " | " +
+              (if .Date != "" then .Date else "N/A" end) + " | " +
+              (if .Email != "" then .Email else "N/A" end) + " | " +
+              (.File | sub(\"^/repo/\"; \"\")) +
+              " |"
             ' gitleaks-report.json
           } >> "$GITHUB_STEP_SUMMARY"
 
       # ---------------------------------
-      # Create issue only for push
+      # Create GitHub Issue (push only)
       # ---------------------------------
       - name: Create GitHub Issue
         if: github.event_name == 'push' && steps.gitleaks.outcome == 'failure'
@@ -78,21 +91,21 @@ jobs:
             const title = 'Secrets detected by Gitleaks';
 
             const body = `
-            **🚨 Security Alert**
+            **🔴 Security Alert**
 
-            Secrets were detected in the repository.
+            Gitleaks detected secrets in this repository.
 
             **Repository:** ${context.repo.owner}/${context.repo.repo}
             **Branch:** ${context.ref.replace('refs/heads/', '')}
-            **Commit:** ${context.sha}
             **Triggered by:** ${context.actor}
 
-            **Action required:**
-            - Remove the secret from the codebase
-            - Rotate the exposed credentials immediately
+            **Immediate actions required:**
+            - Remove secrets from code
+            - Rotate exposed credentials
+            - Audit access logs
 
             ---
-            _This issue was automatically created by github-actions[bot]._
+            _Automatically created by github-actions[bot]_
             `;
 
             const { data: issues } = await github.rest.issues.listForRepo({
@@ -120,14 +133,13 @@ jobs:
                 body: `
                 🔁 **New secret detected**
 
-                **Commit:** ${context.sha}
                 **Triggered by:** @${context.actor}
                 `
               });
             }
 
       # ---------------------------------
-      # Finally fail job
+      # Fail workflow
       # ---------------------------------
       - name: Fail workflow if secrets detected
         if: steps.gitleaks.outcome == 'failure'
