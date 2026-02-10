@@ -23,16 +23,24 @@ jobs:
           fetch-depth: 0
 
       # ---------------------------------
-      # Run Gitleaks (SAFE MODE)
+      # Run Gitleaks (ONLY new commits)
       # ---------------------------------
-      - name: Run Gitleaks
+      - name: Run Gitleaks (ONLY new commits)
         id: gitleaks
         run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            RANGE="${{ github.event.before }}..${{ github.sha }}"
+          else
+            RANGE="-1"
+          fi
+
+          echo "Scanning commit range: $RANGE"
+
           docker run --rm \
             -v "$PWD:/repo" \
             -w /repo \
             zricethezav/gitleaks:latest detect \
-            --source=. \
+            --log-opts="$RANGE" \
             --config=gitleaks.toml \
             --report-format json \
             --report-path gitleaks-report.json \
@@ -122,6 +130,7 @@ jobs:
         run: |
           COUNT=$(jq length gitleaks-report.json)
           echo "Secrets found: $COUNT"
+
           if [ "$COUNT" -gt 0 ]; then
             exit 1
           fi
