@@ -2,5 +2,5 @@
 // Gitleaks default rules always catch these
 
 export const AWS = {
-
+"Hello"
 };
