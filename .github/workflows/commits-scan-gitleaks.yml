@@ -138,6 +138,37 @@ jobs:
             }
 
       # ---------------------------------
+      # Send external email alert on secret detection
+      # ---------------------------------
+      - name: Send Email Alert
+        if: steps.gitleaks.outcome == 'failure'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "🚨 Gitleaks Alert: Secrets detected in ${{ github.repository }}"
+          to: ${{ secrets.ALERT_EMAILS }}
+          from: "Gitleaks CI <${{ secrets.SMTP_USERNAME }}>"
+          body: |
+            🚨 SECURITY ALERT
+
+            Gitleaks detected secrets in the repository.
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+
+            Immediate actions required:
+            - Remove the exposed secret
+            - Rotate the credential immediately
+            - Re-run the pipeline
+
+            This alert was sent automatically by GitHub Actions.
+
+      # ---------------------------------
       # Finally fail job
       # ---------------------------------
       - name: Fail workflow if secrets detected
