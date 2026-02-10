@@ -48,15 +48,26 @@ jobs:
           echo "Scanning range: $RANGE"
 
           docker run --rm \
-            -v $PWD:/repo \
-            zricethezav/gitleaks:latest detect \
-            --source=/repo \
-            --log-opts="$RANGE" \
-            --config=/repo/gitleaks.toml \
-            --report-format sarif \
-            --report-path /repo/gitleaks-report.sarif \
-            --exit-code 1
+          -v $PWD:/repo \
+          zricethezav/gitleaks:latest detect \
+          --source=/repo \
+          --log-opts="$RANGE" \
+          --config=/repo/gitleaks.toml \
+          --report-format sarif \
+          --report-path /repo/gitleaks-report.sarif \
+          --exit-code 1 \
+          --redact
         continue-on-error: true
+
+
+      # ---------------------------------
+      # Upload SARIF to GitHub Security tab
+      # ---------------------------------
+      - name: Upload SARIF
+        if: steps.gitleaks.outcome == 'failure'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks-report.sarif.sarif
 
 
       # ---------------------------------
@@ -71,7 +82,7 @@ jobs:
           const repo = process.env.GITHUB_REPOSITORY;
           const sha = process.env.GITHUB_SHA;
           const repoUrl = `https://github.com/${repo}`;
-          const sarif = JSON.parse(fs.readFileSync('results.sarif', 'utf8'));
+          const sarif = JSON.parse(fs.readFileSync('gitleaks-report.sarif', 'utf8'));
 
           const results = sarif.runs[0].results || [];
 
