@@ -1,7 +1,7 @@
 // Fake AWS credentials for testing
 
 const AWS_ACCESS_KEY_ID = "AKIA12355765691ABCD";
-const AWS_SECRET_ACCESS_KEY = "abcd1534dbcd1234dbcd1234abcd4122abcd1234";
+const AWS_SECRET_ACCESS_KEY = "abcd1534dbcd1234dbcd1234abcd4122bccd2134";
 
 // Fake PEM key (for testing)
 const AWS_SESSION_TOKEN = `
