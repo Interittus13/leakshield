@@ -40,7 +40,7 @@ jobs:
         continue-on-error: true
 
       # ---------------------------------
-      # Show findings in logs
+      # Show findings in logs (debug)
       # ---------------------------------
       - name: Show detected secrets
         if: steps.gitleaks.outcome == 'failure'
@@ -48,10 +48,11 @@ jobs:
           cat gitleaks-report.json
 
       # ---------------------------------
-      # Gitleaks-style Summary Table
+      # Gitleaks-style Summary Table (SAFE)
       # ---------------------------------
       - name: Add summary (Gitleaks UI style)
         if: steps.gitleaks.outcome == 'failure'
+        shell: bash
         run: |
           REPO_URL="https://github.com/${{ github.repository }}"
           REF="${{ github.ref_name }}"
@@ -61,87 +62,30 @@ jobs:
             echo ""
             echo "| Rule ID | Commit | Secret URL | Start Line | Author | Date | Email | File |"
             echo "|--------|--------|------------|------------|--------|------|-------|------|"
-
-            jq -r --arg repo "$REPO_URL" --arg ref "$REF" '
-              .[] |
-              "| \(.RuleID) | " +
-              (if .Commit != "" then .Commit[0:7] else "N/A" end) + " | " +
-              "[View Secret](" +
-                $repo + "/blob/" + $ref + "/" +
-                (.File | sub(\"^/repo/\"; \"\")) +
-                \"#L\" + (.StartLine|tostring) +
-              ") | " +
-              (.StartLine|tostring) + " | " +
-              (if .Author != "" then .Author else "N/A" end) + " | " +
-              (if .Date != "" then .Date else "N/A" end) + " | " +
-              (if .Email != "" then .Email else "N/A" end) + " | " +
-              (.File | sub(\"^/repo/\"; \"\")) +
-              " |"
-            ' gitleaks-report.json
           } >> "$GITHUB_STEP_SUMMARY"
+
+          jq -c '.[]' gitleaks-report.json | while read -r row; do
+            RULE_ID=$(echo "$row" | jq -r '.RuleID')
+            FILE=$(echo "$row" | jq -r '.File | sub("^/repo/"; "")')
+            LINE=$(echo "$row" | jq -r '.StartLine')
+            COMMIT=$(echo "$row" | jq -r '.Commit // "N/A"')
+            AUTHOR=$(echo "$row" | jq -r '.Author // "N/A"')
+            DATE=$(echo "$row" | jq -r '.Date // "N/A"')
+            EMAIL=$(echo "$row" | jq -r '.Email // "N/A"')
+
+            [[ -z "$COMMIT" ]] && COMMIT="N/A"
+            [[ -z "$AUTHOR" ]] && AUTHOR="N/A"
+            [[ -z "$DATE" ]] && DATE="N/A"
+            [[ -z "$EMAIL" ]] && EMAIL="N/A"
+
+            echo "| $RULE_ID | $COMMIT | [View Secret]($REPO_URL/blob/$REF/$FILE#L$LINE) | $LINE | $AUTHOR | $DATE | $EMAIL | $FILE |" \
+              >> "$GITHUB_STEP_SUMMARY"
+          done
 
       # ---------------------------------
       # Create GitHub Issue (push only)
       # ---------------------------------
       - name: Create GitHub Issue
         if: github.event_name == 'push' && steps.gitleaks.outcome == 'failure'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const title = 'Secrets detected by Gitleaks';
-
-            const body = `
-            **🔴 Security Alert**
-
-            Gitleaks detected secrets in this repository.
-
-            **Repository:** ${context.repo.owner}/${context.repo.repo}
-            **Branch:** ${context.ref.replace('refs/heads/', '')}
-            **Triggered by:** ${context.actor}
-
-            **Immediate actions required:**
-            - Remove secrets from code
-            - Rotate exposed credentials
-            - Audit access logs
-
-            ---
-            _Automatically created by github-actions[bot]_
-            `;
-
-            const { data: issues } = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'security,gitleaks'
-            });
-
-            const existingIssue = issues.find(issue => issue.title === title);
-
-            if (!existingIssue) {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title,
-                body,
-                labels: ['security', 'gitleaks', 'automated']
-              });
-            } else {
-              await github.rest.issues.createComment({
-                issue_number: existingIssue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: `
-                🔁 **New secret detected**
-
-                **Triggered by:** @${context.actor}
-                `
-              });
-            }
-
-      # ---------------------------------
-      # Fail workflow
-      # ---------------------------------
-      - name: Fail workflow if secrets detected
-        if: steps.gitleaks.outcome == 'failure'
-        run: exit 1
+        uses: action
 
