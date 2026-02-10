@@ -23,7 +23,6 @@ jobs:
 
       # ---------------------------------
       # Run Gitleaks (NO-GIT MODE)
-      # Scans actual files instead of commit history
       # ---------------------------------
       - name: Run Gitleaks
         id: gitleaks
@@ -49,20 +48,24 @@ jobs:
           cat gitleaks-report.json
 
       # ---------------------------------
-      # Add pretty summary (TABLE FORMAT)
+      # Add pretty summary (FIXED TABLE FORMAT)
       # ---------------------------------
       - name: Add summary (table)
         if: steps.gitleaks.outcome == 'failure'
         run: |
-          echo "## 🚨 Gitleaks Findings" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Rule | File | Line | Secret Type |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|------|------|-------------|" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🚨 Gitleaks Findings"
+            echo ""
+            echo "> Secrets detected in the repository"
+            echo ""
+            echo "| Rule | File | Line | Secret Type |"
+            echo "|------|------|------|-------------|"
 
-          jq -r '
-            .[] |
-            "| \(.RuleID) | \(.File) | \(.StartLine) | \(.Description) |"
-          ' gitleaks-report.json >> $GITHUB_STEP_SUMMARY
+            jq -r '
+              .[] |
+              "| \(.RuleID) | \(.File | sub("^/repo/"; "")) | \(.StartLine) | \(.Description) |"
+            ' gitleaks-report.json
+          } >> "$GITHUB_STEP_SUMMARY"
 
       # ---------------------------------
       # Create issue only for push
