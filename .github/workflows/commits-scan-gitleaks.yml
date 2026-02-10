@@ -53,29 +53,64 @@ jobs:
             --source=/repo \
             --log-opts="$RANGE" \
             --config=/repo/gitleaks.toml \
-            --report-format csv \
-            --report-path /repo/gitleaks-report.csv \
+            --report-format sarif \
+            --report-path /repo/gitleaks-report.sarif \
             --exit-code 1
         continue-on-error: true
 
 
       # ---------------------------------
-      # Show findings in logs
+      # Generate GitHub summary table from SARIF (same as official action)
       # ---------------------------------
-      - name: Show detected secrets
+      - name: Generate summary table
         if: steps.gitleaks.outcome == 'failure'
         run: |
-          cat gitleaks-report.csv
+          node <<'EOF'
+          const fs = require('fs');
+
+          const repo = process.env.GITHUB_REPOSITORY;
+          const sha = process.env.GITHUB_SHA;
+          const repoUrl = `https://github.com/${repo}`;
+          const sarif = JSON.parse(fs.readFileSync('results.sarif', 'utf8'));
+
+          const results = sarif.runs[0].results || [];
+
+          let summary = `## 🛑 Gitleaks detected secrets 🛑\n\n`;
+          summary += `| Rule ID | Commit | Secret URL | Start Line | File |\n`;
+          summary += `|---------|--------|------------|------------|------|\n`;
+
+          results.forEach(r => {
+            const commit = r.partialFingerprints.commitSha;
+            const file = r.locations[0].physicalLocation.artifactLocation.uri;
+            const line = r.locations[0].physicalLocation.region.startLine;
+
+            const commitUrl = `${repoUrl}/commit/${commit}`;
+            const secretUrl = `${repoUrl}/blob/${commit}/${file}#L${line}`;
+
+            summary += `| ${r.ruleId} | [${commit.substring(0,7)}](${commitUrl}) | [View Secret](${secretUrl}) | ${line} | ${file} |\n`;
+          });
+
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+          EOF
 
 
-      # ---------------------------------
-      # Add pretty summary
-      # ---------------------------------
-      - name: Add summary
-        if: steps.gitleaks.outcome == 'failure'
-        run: |
-          echo "## 🚨 Gitleaks Findings" >> $GITHUB_STEP_SUMMARY
-          cat gitleaks-report.csv >> $GITHUB_STEP_SUMMARY
+      # # ---------------------------------
+      # # Show findings in logs
+      # # ---------------------------------
+      # - name: Show detected secrets
+      #   if: steps.gitleaks.outcome == 'failure'
+      #   run: |
+      #     cat gitleaks-report.sarif
+
+
+      # # ---------------------------------
+      # # Add pretty summary
+      # # ---------------------------------
+      # - name: Add summary
+      #   if: steps.gitleaks.outcome == 'failure'
+      #   run: |
+      #     echo "## 🚨 Gitleaks Findings" >> $GITHUB_STEP_SUMMARY
+      #     cat gitleaks-report.sarif >> $GITHUB_STEP_SUMMARY
 
 
       # ---------------------------------
