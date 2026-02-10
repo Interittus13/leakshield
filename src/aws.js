@@ -1,12 +1,14 @@
-// Fake AWS credentials for testing
+// AWS Access Key (VALID FORMAT – fake)
+const AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE";
 
-const AWS_ACCESS_KEY_ID = "AKIA12355765691DCBA";
-const AWS_SECRET_ACCESS_KEY = "abcd1534dbcd1234dbcd1234dcba4122abcd2134";
+// AWS Secret Key (40 chars – valid pattern)
+const AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY";
 
-// Fake PEM key (for testing)
+// PEM-style private key (valid entropy)
 const AWS_SESSION_TOKEN = `
------BEGIN PRIVATE KEY-----
-abc123superlongrandomStringentropysdlue987654321
------END PRIVATE KEY-----
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAz9x4H9x4H9x4H9x4H9x4H9x4H9x4H9x4
+Y3G7v9Y1N9y8yJzXyE9sZ8zqQ4Rz8A1nK8s8Lz8PZ9Z8x7x
+x9QIDAQABAoIBAQCtExamplePrivateKeyMaterial123456
+-----END RSA PRIVATE KEY-----
 `;
-privateKey:"0x7c9bb647797dd919fe8c2ead70d51483f7b4475c88d2499dcc7e225d737f54fb"
