@@ -16,16 +16,14 @@ jobs:
     steps:
 
       # ---------------------------------
-      # Checkout minimal commits only
+      # Checkout code
       # ---------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
       # ---------------------------------
-      # Run Gitleaks using Docker
-      # Scans ONLY changed commits
+      # Run Gitleaks (NO-GIT MODE)
+      # Scans actual files instead of commit history
       # ---------------------------------
       - name: Run Gitleaks
         id: gitleaks
@@ -34,7 +32,7 @@ jobs:
             -v $PWD:/repo \
             zricethezav/gitleaks:latest detect \
             --source=/repo \
-            --log-opts="-p -n 1" \
+            --no-git \
             --config=/repo/.gitleaks.toml \
             --report-format json \
             --report-path /repo/gitleaks-report.json \
@@ -58,12 +56,12 @@ jobs:
         run: |
           echo "## 🚨 Gitleaks Findings" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Rule | File | Line | Commit | Secret Type |" >> $GITHUB_STEP_SUMMARY
-          echo "|------|------|------|--------|-------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Rule | File | Line | Secret Type |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|------|-------------|" >> $GITHUB_STEP_SUMMARY
 
           jq -r '
             .[] |
-            "| \(.RuleID) | \(.File) | \(.StartLine) | \(.Commit[0:7]) | \(.Description) |"
+            "| \(.RuleID) | \(.File) | \(.StartLine) | \(.Description) |"
           ' gitleaks-report.json >> $GITHUB_STEP_SUMMARY
 
       # ---------------------------------
