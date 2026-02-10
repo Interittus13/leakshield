@@ -17,13 +17,11 @@ jobs:
 
       # ---------------------------------
       # Checkout minimal commits only
-      # Faster than full history clone
       # ---------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
-
 
       # ---------------------------------
       # Run Gitleaks using Docker
@@ -40,28 +38,33 @@ jobs:
             --config=/repo/.gitleaks.toml \
             --report-format json \
             --report-path /repo/gitleaks-report.json \
-            --exit-code 1
+            --exit-code 1 \
+            --redact
         continue-on-error: true
 
-
       # ---------------------------------
-      # Show findings in logs
+      # Show findings in logs (raw JSON)
       # ---------------------------------
       - name: Show detected secrets
         if: steps.gitleaks.outcome == 'failure'
         run: |
           cat gitleaks-report.json
 
-
       # ---------------------------------
-      # Add pretty summary
+      # Add pretty summary (TABLE FORMAT)
       # ---------------------------------
-      - name: Add summary
+      - name: Add summary (table)
         if: steps.gitleaks.outcome == 'failure'
         run: |
           echo "## 🚨 Gitleaks Findings" >> $GITHUB_STEP_SUMMARY
-          cat gitleaks-report.json >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Rule | File | Line | Commit | Secret Type |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|------|--------|-------------|" >> $GITHUB_STEP_SUMMARY
 
+          jq -r '
+            .[] |
+            "| \(.RuleID) | \(.File) | \(.StartLine) | \(.Commit[0:7]) | \(.Description) |"
+          ' gitleaks-report.json >> $GITHUB_STEP_SUMMARY
 
       # ---------------------------------
       # Create issue only for push
@@ -74,7 +77,7 @@ jobs:
             const title = 'Secrets detected by Gitleaks';
 
             const body = `
-            **Security Alert**
+            **🚨 Security Alert**
 
             Secrets were detected in the repository.
 
@@ -83,7 +86,7 @@ jobs:
             **Commit:** ${context.sha}
             **Triggered by:** ${context.actor}
 
-            Action required:
+            **Action required:**
             - Remove the secret from the codebase
             - Rotate the exposed credentials immediately
 
@@ -114,7 +117,7 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 body: `
-                New secret detected
+                🔁 **New secret detected**
 
                 **Commit:** ${context.sha}
                 **Triggered by:** @${context.actor}
@@ -128,3 +131,4 @@ jobs:
       - name: Fail workflow if secrets detected
         if: steps.gitleaks.outcome == 'failure'
         run: exit 1
+
