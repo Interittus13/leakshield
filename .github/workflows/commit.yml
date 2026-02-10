@@ -23,22 +23,39 @@ jobs:
         with:
           fetch-depth: 0
 
-      # ---------------------------------
-      # Run Gitleaks (FULL GIT HISTORY MODE)
+       # ---------------------------------
+      # Run Gitleaks using Docker
+      # Scans ONLY changed commits
       # ---------------------------------
       - name: Run Gitleaks
         id: gitleaks
         run: |
+          BEFORE="${{ github.event.before }}"
+          SHA="${{ github.sha }}"
+
+          echo "before=$BEFORE"
+          echo "sha=$SHA"
+
+          # If first push or invalid before SHA
+          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            RANGE="$SHA"
+          else
+            RANGE="$BEFORE..$SHA"
+          fi
+
+          echo "Scanning range: $RANGE"
+
           docker run --rm \
-            -v "$PWD:/repo" \
-            -w /repo \
-            zricethezav/gitleaks:latest detect \
-            --source=. \
-            --log-opts="--all" \
-            --config=gitleaks.toml \
-            --report-format json \
-            --report-path gitleaks-report.json \
-            --redact || true
+          -v $PWD:/repo \
+          zricethezav/gitleaks:latest detect \
+          --source=/repo \
+          --log-opts="$RANGE" \
+          --config=/repo/gitleaks.toml \
+          --report-format json \
+          --report-path /repo/gitleaks-report.json \
+          --exit-code 1 \
+          --redact
+        continue-on-error: true
 
       # ---------------------------------
       # Ensure report file always exists
