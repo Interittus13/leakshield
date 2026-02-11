@@ -28,8 +28,7 @@ jobs:
       # ---------------------------------
       # Run Gitleaks (Push + PR aware)
       # ---------------------------------
-      - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@v2
+      - uses: gitleaks/gitleaks-action@v2
         env:
           GITLEAKS_CONFIG: ${{ github.workspace }}/gitleaks.toml
           GITLEAKS_VERSION: latest
