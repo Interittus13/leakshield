@@ -127,7 +127,6 @@ jobs:
               labels: ["security", "gitleaks"]
             });
 
-
       # ---------------------------------
       # Send external email alert on secret detection
       # ---------------------------------
