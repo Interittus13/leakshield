@@ -82,7 +82,7 @@ jobs:
 
           jq -c '.[]' gitleaks-report.json | while read -r row; do
             RULE_ID=$(echo "$row" | jq -r '.RuleID')
-            FILE=$(echo "$row" | jq -r '.File | sed 's|^/repo/||' | sed 's|^/||')
+            FILE=$(echo "$row" | jq -r '.File' | sed 's|^/repo/||' | sed 's|^/||')
             LINE=$(echo "$row" | jq -r '.StartLine')
             COMMIT=$(echo "$row" | jq -r '.Commit // "N/A"')
             AUTHOR=$(echo "$row" | jq -r '.Author // "N/A"')
