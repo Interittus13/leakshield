@@ -126,7 +126,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'security,gitleaks'
+              labels: 'security,gitleaks' 
             });
 
             const existingIssue = issues.find(issue => issue.title === title);
