@@ -73,6 +73,7 @@ jobs:
       # ---------------------------------
       - name: Add summary (Gitleaks UI style)
         shell: bash
+        if: steps.gitleaks.outcome == 'failure'
         run: |
           REPO_URL="https://github.com/${{ github.repository }}"
           REF="${{ github.ref_name }}"
