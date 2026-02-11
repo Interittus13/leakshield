@@ -2,8 +2,8 @@
 // Gitleaks default rules always catch these
 
 // # AWS Access Key (FAKE - for testing only)
-AWS_ACCESS_KEY_ID="AKIA6F7D8S6A6Q5x3E2R"
-AWS_SECRET_ACCESS_KEY="QwSqSdsq8pAsDfgHLkLzXcVbNm12345opop890AbCf"
+AWS_ACCESS_KEY_ID="AKIA6F7D8S6A7Q5x3E2R"
+AWS_SECRET_ACCESS_KEY="QwSqSdsq9pAsDfgHLkLzXcVbNm12345opop890AbCf"
 
 // # AWS Session Token (FAKE - for testing only)
 AWS_SESSION_TOKEN = `
