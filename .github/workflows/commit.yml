@@ -48,7 +48,8 @@ jobs:
             --config=gitleaks.toml \
             --report-format json \
             --report-path gitleaks-report.json \
-            --redact || true
+            --exit-code 1 \
+            --redact
 
       # ---------------------------------
       # Ensure report file always exists
