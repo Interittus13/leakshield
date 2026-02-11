@@ -89,7 +89,7 @@ jobs:
             DATE=$(echo "$row" | jq -r '.Date // "N/A"')
             EMAIL=$(echo "$row" | jq -r '.Email // "N/A"')
 
-            echo "| $RULE_ID | $COMMIT | [View Secret]($REPO_URL/blob/$REF/$FILE#L$LINE) | $LINE | $AUTHOR | $DATE | $EMAIL | $FILE |" \
+            echo "| $RULE_ID | $COMMIT | [View Secret]($REPO_URL/blob/$COMMIT/$FILE#L$LINE) | $LINE | $AUTHOR | $DATE | $EMAIL | $FILE |" \
               >> "$GITHUB_STEP_SUMMARY"
           done
 
