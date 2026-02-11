@@ -1,9 +1,6 @@
 name: Gitleaks Commits Scanning
 
-on:
-  push:
-  pull_request:
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 jobs:
   gitleaks:
@@ -13,7 +10,7 @@ jobs:
     permissions:
       contents: read
       issues: write
-      pull-requests: read
+      pull-requests: write
 
     steps:
       # ---------------------------------
