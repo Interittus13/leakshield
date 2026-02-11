@@ -32,18 +32,7 @@ jobs:
       - name: Run Gitleaks
         id: gitleaks
         run: |
-          BEFORE="${{ github.event.before }}"
-          SHA="${{ github.sha }}"
-
-          echo "before=$BEFORE"
-          echo "sha=$SHA"
-
-          # If first push or invalid before SHA
-          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-            RANGE="$SHA"
-          else
-            RANGE="$BEFORE..$SHA"
-          fi
+          RANGE="HEAD~1..HEAD"
 
           echo "Scanning range: $RANGE"
 
