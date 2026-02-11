@@ -73,6 +73,7 @@ jobs:
       - name: Add summary (Gitleaks UI style)
         shell: bash
         run: |
+          REPORT_FILE="gitleaks-report-summary.md"
           REPO_URL="https://github.com/${{ github.repository }}"
           REF="${{ github.ref_name }}"
 
@@ -81,7 +82,7 @@ jobs:
             echo ""
             echo "| Rule ID | Commit | Secret URL | Start Line | Author | Date | Email | File |"
             echo "|--------|--------|------------|------------|--------|------|-------|------|"
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "$REPORT_FILE"
 
           jq -c '.[]' gitleaks-report.json | while read -r row; do
             RULE_ID=$(echo "$row" | jq -r '.RuleID')
@@ -93,7 +94,7 @@ jobs:
             EMAIL=$(echo "$row" | jq -r '.Email // "N/A"')
 
             echo "| $RULE_ID | $COMMIT | [View Secret]($REPO_URL/blob/$REF/$FILE#L$LINE) | $LINE | $AUTHOR | $DATE | $EMAIL | $FILE |" \
-              >> "$GITHUB_STEP_SUMMARY"
+              >> "$REPORT_FILE"
           done
 
       # ---------------------------------
@@ -109,25 +110,63 @@ jobs:
       # Create GitHub Issue (ONLY on push)
       # ---------------------------------
       - name: Create GitHub Issue
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && steps.gitleaks.outcome == 'failure'
         uses: actions/github-script@v7
         with:
           script: |
-            const fs = require('fs');
-            const findings = JSON.parse(fs.readFileSync('gitleaks-report.json', 'utf8'));
+            const report = require('fs').readFileSync('gitleaks-report-summary.md','utf8');
+            const title = 'Secrets detected by Gitleaks';
 
-            if (findings.length === 0) {
-              console.log('No secrets found. Skipping issue creation.');
-              return;
-            }
+            const body = `
+            **Security Alert**
 
-            await github.rest.issues.create({
+            Secrets were detected in the repository.
+
+            ${report}
+            **Repository:** ${context.repo.owner}/${context.repo.repo}
+            **Branch:** ${context.ref.replace('refs/heads/', '')}
+            **Commit:** ${context.sha}
+            **Triggered by:** ${context.actor}
+
+            Action required:
+            - Remove the secret from the codebase
+            - Rotate the exposed credentials immediately
+
+            ---
+            _This issue was automatically created by github-actions[bot]._
+            `;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: "🔴 Secrets detected by Gitleaks",
-              body: `Gitleaks detected **${findings.length}** secrets.\n\nPlease rotate credentials immediately.`,
-              labels: ["security", "gitleaks"]
+              state: 'open',
+              labels: 'security,gitleaks'
             });
+
+            const existingIssue = issues.find(issue => issue.title === title);
+
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['security', 'gitleaks', 'automated']
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: existingIssue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `
+                New secret detected
+
+                **Commit:** ${context.sha}
+                **Triggered by:** @${context.actor}
+                `
+              });
+            }
+
 
       # ---------------------------------
       # Send external email alert on secret detection
@@ -148,6 +187,8 @@ jobs:
 
             Gitleaks detected secrets in the repository.
 
+            $(cat gitleaks-report-summary.md)
+
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
             Commit: ${{ github.sha }}
@@ -161,13 +202,8 @@ jobs:
             This alert was sent automatically by GitHub Actions.
 
       # ---------------------------------
-      # FAIL pipeline if secrets found
+      # Finally FAIL pipeline if secrets found
       # ---------------------------------
-      - name: Fail workflow if secrets found
-        run: |
-          COUNT=$(jq length gitleaks-report.json)
-          echo "Secrets found: $COUNT"
-
-          if [ "$COUNT" -gt 0 ]; then
-            exit 1
-          fi
+      - name: Fail workflow if secrets detected
+        if: steps.gitleaks.outcome == 'failure'
+        run: exit 1
