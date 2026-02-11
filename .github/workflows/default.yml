@@ -1,8 +1,6 @@
 name: Gitleaks Commits Scanning
 
-on:
-  push:
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 jobs:
   gitleaks:
@@ -28,9 +26,10 @@ jobs:
       # ---------------------------------
       # Run Gitleaks (Push + PR aware)
       # ---------------------------------
-      - uses: gitleaks/gitleaks-action@v2
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
         env:
           GITLEAKS_CONFIG: ${{ github.workspace }}/gitleaks.toml
-          GITLEAKS_VERSION: latest
+          # GITLEAKS_VERSION: latest
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # Only required for Organizations, not personal accounts.
