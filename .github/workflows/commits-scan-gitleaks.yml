@@ -12,6 +12,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: read
 
     steps:
 
@@ -26,27 +27,30 @@ jobs:
 
 
       # ---------------------------------
-      # Run Gitleaks using Docker
-      # Scans ONLY changed commits
+      # Run Gitleaks (Push + PR aware)
       # ---------------------------------
       - name: Run Gitleaks
         id: gitleaks
         run: |
-          RANGE="HEAD~1..HEAD"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            RANGE="${{ github.event.before }}..${{ github.sha }}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          else
+            RANGE="-1"
+          fi
 
-          echo "Scanning range: $RANGE"
+          echo "Scanning commit range: $RANGE"
 
           docker run --rm \
-          -v $PWD:/repo \
-          zricethezav/gitleaks:latest detect \
-          --source=/repo \
-          --log-opts="$RANGE" \
-          --config=/repo/gitleaks.toml \
-          --report-format json \
-          --report-path /repo/gitleaks-report.json \
-          --exit-code 1 \
-          --redact
-        continue-on-error: true
+            -v "$PWD:/repo" \
+            -w /repo \
+            zricethezav/gitleaks:latest detect \
+            --log-opts="$RANGE" \
+            --config=gitleaks.toml \
+            --report-format json \
+            --report-path gitleaks-report.json \
+            --redact || true
 
 
       # ---------------------------------
