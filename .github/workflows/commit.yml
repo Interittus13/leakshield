@@ -2,6 +2,7 @@ name: Gitleaks Commits Scanning
 
 on:
   push:
+  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -12,11 +13,11 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: read
 
     steps:
       # ---------------------------------
-      # Checkout repository with FULL history
-      # Required for commit-based secret detection
+      # Checkout repository (FULL HISTORY)
       # ---------------------------------
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,32 +25,40 @@ jobs:
           fetch-depth: 0
 
       # ---------------------------------
-      # Run Gitleaks Scan (FULL GIT MODE)
-      # Scans entire git history for secrets
+      # Run Gitleaks (Push + PR aware)
       # ---------------------------------
       - name: Run Gitleaks
         id: gitleaks
         run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            RANGE="${{ github.event.before }}..${{ github.sha }}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          else
+            RANGE="-1"
+          fi
+
+          echo "Scanning commit range: $RANGE"
+
           docker run --rm \
-            -v $PWD:/repo \
+            -v "$PWD:/repo" \
+            -w /repo \
             zricethezav/gitleaks:latest detect \
-            --source=/repo \
-            --config=/repo/.gitleaks.toml \
+            --log-opts="$RANGE" \
+            --config=gitleaks.toml \
             --report-format json \
-            --report-path /repo/gitleaks-report.json \
+            --report-path gitleaks-report.json \
             --redact || true
 
       # ---------------------------------
       # Ensure report file always exists
-      # Prevents failures when no secrets found
       # ---------------------------------
       - name: Ensure Gitleaks report exists
         run: |
           [ -f gitleaks-report.json ] || echo "[]" > gitleaks-report.json
 
       # ---------------------------------
-      # Print detected secrets to logs
-      # Helpful for debugging
+      # Debug: Print raw findings
       # ---------------------------------
       - name: Show detected secrets
         run: |
@@ -57,8 +66,7 @@ jobs:
           cat gitleaks-report.json
 
       # ---------------------------------
-      # Add GitHub Summary (Table format)
-      # Clean UI in Actions Summary tab
+      # GitHub Actions Summary (UI Table)
       # ---------------------------------
       - name: Add summary (Gitleaks UI style)
         shell: bash
@@ -87,8 +95,7 @@ jobs:
           done
 
       # ---------------------------------
-      # Upload Gitleaks Report as Artifact
-      # Allows downloading raw findings
+      # Upload report as artifact
       # ---------------------------------
       - name: Upload Gitleaks report
         uses: actions/upload-artifact@v4
@@ -97,7 +104,7 @@ jobs:
           path: gitleaks-report.json
 
       # ---------------------------------
-      # Create GitHub Issue if secrets exist
+      # Create GitHub Issue (ONLY on push)
       # ---------------------------------
       - name: Create GitHub Issue
         if: github.event_name == 'push'
@@ -120,10 +127,41 @@ jobs:
               labels: ["security", "gitleaks"]
             });
 
+
       # ---------------------------------
-      # Fail workflow if secrets exist
+      # Send external email alert on secret detection
       # ---------------------------------
-      # This is the ONLY place the pipeline can fail
+      - name: Send Email Alert
+        if: steps.gitleaks.outcome == 'failure'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "🚨 Gitleaks Alert: Secrets detected in ${{ github.repository }}"
+          to: ${{ secrets.ALERT_EMAILS }}
+          from: "Gitleaks CI <${{ secrets.SMTP_USERNAME }}>"
+          body: |
+            🚨 SECURITY ALERT
+
+            Gitleaks detected secrets in the repository.
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+
+            Immediate actions required:
+            - Remove the exposed secret
+            - Rotate the credential immediately
+            - Re-run the pipeline
+
+            This alert was sent automatically by GitHub Actions.
+
+      # ---------------------------------
+      # FAIL pipeline if secrets found
+      # ---------------------------------
       - name: Fail workflow if secrets found
         run: |
           COUNT=$(jq length gitleaks-report.json)
