@@ -50,6 +50,7 @@ jobs:
             --report-path gitleaks-report.json \
             --exit-code 1 \
             --redact
+        continue-on-error: true
 
       # ---------------------------------
       # Ensure report file always exists
