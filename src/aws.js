@@ -2,10 +2,10 @@
 // Gitleaks default rules always catch these
 
 // VALID AWS Access Key (20 chars)
-const AWS_ACCESS_KEY_ID = "AKIA7D2K7Q9M4ZLX36P2";
+const AWS_ACCESS_KEY_ID = "AKIA8D2K7Q9M4ZLX36P2";
 
 // VALID AWS Secret Key (40 chars, high entropy)
-const AWS_SECRET_ACCESS_KEY = "rX5MZ7R2D8C4YQK7L5P3B1W0HVSNATEJMRU";
+const AWS_SECRET_ACCESS_KEY = "rX6MZ7R2D8C4YQK7L5P3B1W0HVSNATEJMRU";
 
 // REALISTIC PEM private key (enough entropy)
 const AWS_SESSION_TOKEN = `

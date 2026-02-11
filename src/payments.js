@@ -2,10 +2,10 @@
 SENDGRID_API_KEY = "SG.1234567890dqfdefghijklmnopqrstuvwxyz.abcdefghijklmnopqrstuvwxyz1234567890"
 
 // # Twilio Auth Token (FAKE - for testing only)
-TWILIO_AUTH_TOKEN = "1234567890afcfdfghijklmnopqrstuv"
+TWILIO_AUTH_TOKEN = "1234567890ahcfdfghijklmnopqrstuv"
 
 // # Mailgun API Key (FAKE - for testing only)
-MAILGUN_API_KEY = "key-1234567890fecddfghijklmnopqrstuvwxyz"
+MAILGUN_API_KEY = "key-1234567890fhcddfghijklmnopqrstuvwxyz"
 
 // # Firebase Service Account Key (FAKE - for testing only)
 FIREBASE_KEY = {

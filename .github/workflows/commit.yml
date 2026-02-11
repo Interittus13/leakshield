@@ -97,7 +97,7 @@ jobs:
               >> "$REPORT_FILE"
           done
           
-          cat gitleaks-summary.md >> "$GITHUB_STEP_SUMMARY"
+          cat gitleaks-report-summary.md >> "$GITHUB_STEP_SUMMARY"
 
       # ---------------------------------
       # Upload report as artifact
