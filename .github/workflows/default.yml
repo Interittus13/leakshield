@@ -1,0 +1,35 @@
+name: Gitleaks Commits Scanning
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  gitleaks:
+    name: Gitleaks Scan
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+
+    steps:
+
+      # ---------------------------------
+      # Checkout minimal commits only
+      # Faster than full history clone
+      # ---------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ---------------------------------
+      # Run Gitleaks (Push + PR aware)
+      # ---------------------------------
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_CONFIG: ${{ github.workspace }}/gitleaks.toml
+          # GITLEAKS_VERSION: latest
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # Only required for Organizations, not personal accounts.

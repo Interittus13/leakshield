@@ -1,14 +1,17 @@
 // This file simulates leaked AWS credentials
 // Gitleaks default rules always catch these
 
-export const AWS = {
-  accessKeyId: "AKIA4F7XXAMPSE12345",
-  secretAccessKey: "QwErTyUiOWDsWfGhJkLzXcVbNm1234567890AbCd",
-  STRIPE_SECRET_KEY:"sk_test_99H8sffhksdfhsdfhsdfhsdfhsdf",
-  GITHUB_TOKEN:"ghp_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r",
-  PRIVATE_KEY: `
-  -----BEGIN PRIVATE KEY-----
-abc123superlongrandomstringwithentropyvalue987654321
------END PRIVATE KEY-----
-`
-};
+// VALID AWS Access Key (20 chars)
+const AWS_ACCESS_KEY_ID = "AKIA8D2K7Q9M4ZLX36P2";
+
+// VALID AWS Secret Key (40 chars, high entropy)
+const AWS_SECRET_ACCESS_KEY = "rX8DZ7R2D8C4YQK7L5P3B1W0HVSNATEJMRU";
+
+// REALISTIC PEM private key (enough entropy)
+const AWS_SESSION_TOKEN = `
+-----BEGIN RSA PRIVATE KEY-----
+MIIEpAIBAAKCAQEAzQ9N8X7R3K6PZ2S5L2H4V8W9FJ6
+9R2M3K7X8Q5LZP4C6H2D9B1V7F8N5B1B
+Q9X2Z3K7P5R6M8L4F1H9V0B2D7C6W5J
+-----END RSA PRIVATE KEY-----
+`;

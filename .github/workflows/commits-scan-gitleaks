@@ -12,6 +12,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      pull-requests: read
 
     steps:
 
@@ -26,56 +27,71 @@ jobs:
 
 
       # ---------------------------------
-      # Run Gitleaks using Docker
-      # Scans ONLY changed commits
+      # Run Gitleaks (Push + PR aware)
       # ---------------------------------
       - name: Run Gitleaks
         id: gitleaks
         run: |
-          BEFORE="${{ github.event.before }}"
-          SHA="${{ github.sha }}"
-
-          echo "before=$BEFORE"
-          echo "sha=$SHA"
-
-          # If first push or invalid before SHA
-          if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
-            RANGE="$SHA"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            RANGE="${{ github.event.before }}..${{ github.sha }}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
           else
-            RANGE="$BEFORE..$SHA"
+            RANGE="-1"
           fi
 
-          echo "Scanning range: $RANGE"
+          echo "Scanning commit range: $RANGE"
 
           docker run --rm \
-            -v $PWD:/repo \
+            -v "$PWD:/repo" \
+            -w /repo \
             zricethezav/gitleaks:latest detect \
-            --source=/repo \
             --log-opts="$RANGE" \
-            --config=/repo/gitleaks.toml \
+            --config=gitleaks.toml \
             --report-format json \
-            --report-path /repo/gitleaks-report.json \
+            --report-path gitleaks-report.json \
             --exit-code 1
+            --redact
         continue-on-error: true
 
 
       # ---------------------------------
-      # Show findings in logs
+      # Ensure report file always exists
       # ---------------------------------
-      - name: Show detected secrets
-        if: steps.gitleaks.outcome == 'failure'
+      - name: Ensure Gitleaks report exists
         run: |
-          cat gitleaks-report.json
+          [ -f gitleaks-report.json ] || echo "[]" > gitleaks-report.json
 
 
       # ---------------------------------
-      # Add pretty summary
+      # GitHub Actions Summary (UI Table)
       # ---------------------------------
-      - name: Add summary
+      - name: Add summary (Gitleaks UI style)
+        shell: bash
         if: steps.gitleaks.outcome == 'failure'
         run: |
-          echo "## 🚨 Gitleaks Findings" >> $GITHUB_STEP_SUMMARY
-          cat gitleaks-report.json >> $GITHUB_STEP_SUMMARY
+          REPO_URL="https://github.com/${{ github.repository }}"
+          REF="${{ github.ref_name }}"
+
+          {
+            echo "## 🔐 Gitleaks Security Scan Report"
+            echo ""
+            echo "| Rule ID | Commit | Secret URL | Start Line | Author | Date | Email | File |"
+            echo "|--------|--------|------------|------------|--------|------|-------|------|"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          jq -c '.[]' gitleaks-report.json | while read -r row; do
+            RULE_ID=$(echo "$row" | jq -r '.RuleID')
+            FILE=$(echo "$row" | jq -r '.File' | sed 's|^/repo/||' | sed 's|^/||')
+            LINE=$(echo "$row" | jq -r '.StartLine')
+            COMMIT=$(echo "$row" | jq -r '.Commit // "N/A"')
+            AUTHOR=$(echo "$row" | jq -r '.Author // "N/A"')
+            DATE=$(echo "$row" | jq -r '.Date // "N/A"')
+            EMAIL=$(echo "$row" | jq -r '.Email // "N/A"')
+
+            echo "| $RULE_ID | $COMMIT | [View Secret]($REPO_URL/blob/$COMMIT/$FILE#L$LINE) | $LINE | $AUTHOR | $DATE | $EMAIL | $FILE |" \
+              >> "$GITHUB_STEP_SUMMARY"
+          done
 
 
       # ---------------------------------
@@ -110,7 +126,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'security,gitleaks'
+              labels: 'security,gitleaks' 
             });
 
             const existingIssue = issues.find(issue => issue.title === title);

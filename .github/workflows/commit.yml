@@ -1,0 +1,237 @@
+name: Gitleaks Commits Scanning
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  gitleaks:
+    name: Gitleaks Scan
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+
+    steps:
+      # ---------------------------------
+      # Checkout repository (FULL HISTORY)
+      # ---------------------------------
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ---------------------------------
+      # Run Gitleaks (Push + PR aware)
+      # ---------------------------------
+      - name: Run Gitleaks
+        id: gitleaks
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            RANGE="${{ github.event.before }}..${{ github.sha }}"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            RANGE="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          else
+            RANGE="-1"
+          fi
+
+          echo "Scanning commit range: $RANGE"
+
+          docker run --rm \
+            -v "$PWD:/repo" \
+            -w /repo \
+            zricethezav/gitleaks:latest detect \
+            --log-opts="$RANGE" \
+            --config=gitleaks.toml \
+            --report-format json \
+            --report-path gitleaks-report.json \
+            --exit-code 1 \
+            --redact
+        continue-on-error: true
+
+      # ---------------------------------
+      # Ensure report file always exists
+      # ---------------------------------
+      - name: Ensure Gitleaks report exists
+        run: |
+          [ -f gitleaks-report.json ] || echo "[]" > gitleaks-report.json
+
+      # ---------------------------------
+      # Debug: Print raw findings
+      # ---------------------------------
+      - name: Show detected secrets
+        run: |
+          echo "Raw Gitleaks JSON output:"
+          cat gitleaks-report.json
+
+      # ---------------------------------
+      # GitHub Actions Summary (UI Table)
+      # ---------------------------------
+      - name: Add summary (Gitleaks UI style)
+        shell: bash
+        run: |
+          REPORT_FILE="gitleaks-report-summary.md"
+          REPO_URL="https://github.com/${{ github.repository }}"
+          REF="${{ github.ref_name }}"
+
+          {
+            echo "## 🔐 Gitleaks Security Scan Report"
+            echo ""
+            echo "| Rule ID | Commit | Secret URL | Start Line | Author | Date | Email | File |"
+            echo "|--------|--------|------------|------------|--------|------|-------|------|"
+          } >> "$REPORT_FILE"
+
+          jq -c '.[]' gitleaks-report.json | while read -r row; do
+            RULE_ID=$(echo "$row" | jq -r '.RuleID')
+            FILE=$(echo "$row" | jq -r '.File | sub("^/repo/"; "")')
+            LINE=$(echo "$row" | jq -r '.StartLine')
+            COMMIT=$(echo "$row" | jq -r '.Commit // "N/A"')
+            AUTHOR=$(echo "$row" | jq -r '.Author // "N/A"')
+            DATE=$(echo "$row" | jq -r '.Date // "N/A"')
+            EMAIL=$(echo "$row" | jq -r '.Email // "N/A"')
+
+            echo "| $RULE_ID | $COMMIT | [View Secret]($REPO_URL/blob/$REF/$FILE#L$LINE) | $LINE | $AUTHOR | $DATE | $EMAIL | $FILE |" \
+              >> "$REPORT_FILE"
+          done
+          
+          cat gitleaks-report-summary.md >> "$GITHUB_STEP_SUMMARY"
+
+      # ---------------------------------
+      # Upload report as artifact
+      # ---------------------------------
+      - name: Upload Gitleaks report
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+
+      # ---------------------------------
+      # Create GitHub Issue (ONLY on push)
+      # ---------------------------------
+      - name: Create GitHub Issue
+        if: github.event_name == 'push' && steps.gitleaks.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const report = require('fs').readFileSync('gitleaks-report-summary.md','utf8');
+            const title = 'Secrets detected by Gitleaks';
+
+            const body = `
+            **Security Alert**
+
+            Secrets were detected in the repository.
+
+            ${report}
+            **Repository:** ${context.repo.owner}/${context.repo.repo}
+            **Branch:** ${context.ref.replace('refs/heads/', '')}
+            **Commit:** ${context.sha}
+            **Triggered by:** ${context.actor}
+
+            Action required:
+            - Remove the secret from the codebase
+            - Rotate the exposed credentials immediately
+
+            ---
+            _This issue was automatically created by github-actions[bot]._
+            `;
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'security,gitleaks'
+            });
+
+            const existingIssue = issues.find(issue => issue.title === title);
+
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['security', 'gitleaks', 'automated']
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: existingIssue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: `
+                New secret detected
+                
+                ${report}
+
+                Commit: ${context.sha}
+                Triggered by: @${context.actor}
+                `
+              });
+            }
+
+      # ---------------------------------
+      # PR comment only if failed
+      # ---------------------------------
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.gitleaks.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `
+              **Gitleaks Alert – Secrets Detected**
+
+              Secrets were detected in this PR.
+
+              **Repository:** ${context.repo.owner}/${context.repo.repo}
+              **PR:** #${context.issue.number}
+              **Commit:** ${context.sha}
+
+              Please remove the secret immediately and rotate any exposed credentials.
+              `
+            });
+
+
+      # ---------------------------------
+      # Send external email alert on secret detection
+      # ---------------------------------
+      - name: Send Email Alert
+        if: steps.gitleaks.outcome == 'failure'
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "🚨 Gitleaks Alert: Secrets detected in ${{ github.repository }}"
+          to: ${{ secrets.ALERT_EMAILS }}
+          from: "Gitleaks CI <${{ secrets.SMTP_USERNAME }}>"
+          attachments: gitleaks-report-summary.md
+          body: |
+            🚨 SECURITY ALERT
+
+            Gitleaks detected secrets in the repository.
+
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Actor: ${{ github.actor }}
+
+            Immediate actions required:
+            - Remove the exposed secret
+            - Rotate the credential immediately
+            - Re-run the pipeline
+
+            This alert was sent automatically by GitHub Actions.
+
+      # ---------------------------------
+      # Finally FAIL pipeline if secrets found
+      # ---------------------------------
+      - name: Fail workflow if secrets detected
+        if: steps.gitleaks.outcome == 'failure'
+        run: exit 1
