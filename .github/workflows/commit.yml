@@ -96,6 +96,8 @@ jobs:
             echo "| $RULE_ID | $COMMIT | [View Secret]($REPO_URL/blob/$REF/$FILE#L$LINE) | $LINE | $AUTHOR | $DATE | $EMAIL | $FILE |" \
               >> "$REPORT_FILE"
           done
+          
+          cat gitleaks-summary.md >> "$GITHUB_STEP_SUMMARY"
 
       # ---------------------------------
       # Upload report as artifact
