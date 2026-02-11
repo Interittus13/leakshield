@@ -162,9 +162,11 @@ jobs:
                 repo: context.repo.repo,
                 body: `
                 New secret detected
+                
+                ${report}
 
-                **Commit:** ${context.sha}
-                **Triggered by:** @${context.actor}
+                Commit: ${context.sha}
+                Triggered by: @${context.actor}
                 `
               });
             }
