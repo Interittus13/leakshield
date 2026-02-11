@@ -8,5 +8,5 @@ AWS_SECRET_ACCESS_KEY="QwSqSdsq5pAsDfgHLkLzXcVbNm12345opop890AbCf"
 // # AWS Session Token (FAKE - for testing only)
 AWS_SESSION_TOKEN = `
 -----BEGIN PRIVATE KEY-----
-abc123superlongrandomstringsIshenjropyvalue987654325
+abc123superlongrandomstringsJshenjropyvalue987654325
 -----END PRIVATE KEY-----`

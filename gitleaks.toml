@@ -82,6 +82,13 @@ entropy = 2
 keywords = ["adobe"]
 
 [[rules]]
+id = "ethereum-private-key"
+description = "Detect Ethereum private keys"
+regex = '''0x[a-fA-F0-9]{64}'''
+tags = ["crypto", "ethereum"]
+
+
+[[rules]]
 id = "adobe-client-secret"
 description = "Discovered a potential Adobe Client Secret, which, if exposed, could allow unauthorized Adobe service access and data manipulation."
 regex = '''\b(p8e-(?i)[a-z0-9]{32})(?:[\x60'"\s;]|\\[nr]|$)'''
