@@ -50,7 +50,7 @@ jobs:
             --config=gitleaks.toml \
             --report-format json \
             --report-path gitleaks-report.json \
-            --redact
+            --redact=20
             --exit-code 1
         continue-on-error: true
 
